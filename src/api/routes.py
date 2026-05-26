@@ -1,8 +1,45 @@
-from flask import request, jsonify, Blueprint
+"""
+This module takes care of starting the API Server, Loading the DB and Adding the endpoints
+"""
+from flask import Flask, request, jsonify, url_for, Blueprint
 from api.models import db, User
-from api.utils import create_token, verify_token
+from api.utils import generate_sitemap, APIException
+from flask_cors import CORS
+import jwt
+from datetime import datetime, timedelta
 
 api = Blueprint('api', __name__)
+
+# Allow CORS requests to this API
+CORS(api)
+
+SECRET_KEY = 'your-secret-key-change-this'
+
+def create_token(user_id, email):
+    payload = {
+        'user_id': user_id,
+        'email': email,
+        'exp': datetime.utcnow() + timedelta(hours=24)
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+
+def verify_token(token):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        return payload
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+@api.route('/hello', methods=['POST', 'GET'])
+def handle_hello():
+
+    response_body = {
+        "message": "Hello! I'm a message that came from the backend, check the network tab on the google inspector and you will see the GET request"
+    }
+
+    return jsonify(response_body), 200
 
 @api.route('/signup', methods=['POST'])
 def signup():
@@ -19,7 +56,7 @@ def signup():
         if existing_user:
             return jsonify({"error": "User with this email already exists"}), 400
         
-        new_user = User(email=email)
+        new_user = User(email=email, is_active=True)
         new_user.set_password(password)
         
         db.session.add(new_user)
